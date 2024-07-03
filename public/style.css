@@ -1,0 +1,43 @@
+#login, #loggedin {
+    display: none;
+}
+
+.text-overflow {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 500px;
+}
+
+#progress-bar {
+    position: relative;
+}
+
+#play-marker {
+    position:absolute;
+    top: 35px;
+    transition: left 200ms;
+    transition-timing-function: linear;
+}
+
+.circle {
+    position:relative;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    background: #080;
+    color: antiquewhite;
+    text-align: center;
+}
+
+.down-triangle {
+    position:relative;
+    width: 0; 
+    height: 0;
+    top: -10px;
+    border-left: 20px solid transparent;
+    border-right: 20px solid transparent;
+    border-top: 20px solid #080;
+}
+

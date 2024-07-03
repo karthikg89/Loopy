@@ -1,0 +1,347 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Example of the Authorization Code flow with Spotify</title>
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/11.0.2/css/bootstrap-slider.css" integrity="sha512-SZgE3m1he0aEF3tIxxnz/3mXu/u/wlMNxQSnE0Cni9j/O8Gs+TjM9tm1NX34nRQ7GiLwUEzwuE3Wv2FLz2667w==" crossorigin="anonymous" referrerpolicy="no-referrer" /> -->
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.3/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="style.css">
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div id="login">
+        <h1>This is an example of the Authorization Code flow</h1>
+        <a href="/login" class="btn btn-primary">Log in with Spotify</a>
+      </div>
+      <div id="loggedin">
+        <div id="user-profile">
+        </div>
+        <div id="oauth">
+        </div>
+        <div id="music">
+        </div>
+
+        <p>
+          <label for="amount">Price range:</label>
+          <input type="text" id="amount" readonly="" style="border:0; color:#f6931f; font-weight:bold;">
+        </p>
+        
+        <div id="progress-bar">
+          <div id="slider-range"></div>
+          <div id="play-marker">
+            <div id="progress" class="circle"></div>
+            <div class="down-triangle"></div>
+          </div>
+        </div>
+        <br />
+
+        <!-- <button class="btn btn-default" id="obtain-new-token">Obtain new token using the refresh token</button> -->
+        <button class="btn btn-default" id="play-music">Play!</button>
+        <button class="btn btn-default" id="pause-music">Pause!</button>
+        <button class="btn btn-default" id="restart-loop">Restart</button>
+        <button class="btn btn-default" data-toggle="button" id="set-loop">Set Loop</button>
+        <button class="btn btn-default" id="reset-loop">Reset</button>
+      </div>
+    </div>
+
+    <script id="user-profile-template" type="text/x-handlebars-template">
+      <!-- <h1>Logged in as {{display_name}}</h1> -->
+      <div class="media">
+        <div class="pull-left">
+          <!-- <img class="media-object" width="150" src="{{images.0.url}}" /> -->
+        </div>
+        <div class="media-body">
+          <!-- <dl class="dl-horizontal">
+            <dt>Display name</dt><dd class="clearfix">{{display_name}}</dd>
+            <dt>Id</dt><dd>{{id}}</dd>
+            <dt>Email</dt><dd>{{email}}</dd>
+            <dt>Spotify URI</dt><dd><a href="{{external_urls.spotify}}">{{external_urls.spotify}}</a></dd>
+            <dt>Link</dt><dd><a href="{{href}}">{{href}}</a></dd>
+            <dt>Profile Image</dt><dd class="clearfix"><a href="{{images.0.url}}">{{images.0.url}}</a></dd>
+            <dt>Country</dt><dd>{{country}}</dd>
+          </dl> -->
+        </div>
+      </div>
+    </script>
+
+    <script id="oauth-template" type="text/x-handlebars-template">
+      <!-- <h2>oAuth info</h2>
+      <dl class="dl-horizontal">
+        <dt>Access token</dt><dd class="text-overflow">{{access_token}}</dd>
+        <dt>Refresh token</dt><dd class="text-overflow">{{refresh_token}}</dd>
+      </dl> -->
+    </script>
+    
+    <script id="music-template" type="text/x-handlebars-template">
+      <h2>Song Info</h2>
+      <dl class="dl-horizontal">
+        <dt>Title</dt><dd class="text-overflow">{{song_title}}</dd>
+        <dt>Current Position</dt><dd class="text-overflow">{{curr_pos}}</dd>
+        <dt>Length</dt><dd class="text-overflow">{{length}}</dd>
+      </dl>
+    </script>
+
+    <script id="progress-template" type="text/x-handlebars-template">
+      {{curr_pos}}
+    </script>
+
+
+    
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0-alpha.1/handlebars.min.js"></script>
+    <!-- <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script> -->
+    <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
+    <script src="https://code.jquery.com/ui/1.13.3/jquery-ui.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/11.0.2/bootstrap-slider.min.js" integrity="sha512-f0VlzJbcEB6KiW8ZVtL+5HWPDyW1+nJEjguZ5IVnSQkvZbwBt2RfCBY0CBO1PsMAqxxrG4Di6TfsCPP3ZRwKpA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> -->
+   
+    <script>
+      function dispTime(ms) {
+          var sec = Math.floor(ms / 1000);
+          var min = Math.floor(sec / 60);
+          var rem_sec = sec % 60;
+
+          return min + ':' + rem_sec.toString().padStart(2, '0');
+        }
+    </script>
+
+    <script>
+      $( function() {
+        $( "#slider-range" ).slider({
+          range: true,
+          min: 0,
+          max: 500,
+          values: [ 75, 300 ],
+          slide: function( event, ui ) {
+            $( "#amount" ).val( "$" + dispTime(ui.values[ 0 ]) + " - $" + dispTime(ui.values[ 1 ] ));
+          }
+        });
+        $( "#amount" ).val( "$" + $( "#slider-range" ).slider( "values", 0 ) +
+          " - $" + $( "#slider-range" ).slider( "values", 1 ) );
+        
+      } );
+      
+    </script>
+    
+    <script>
+      (function() {
+        /**
+         * Obtains parameters from the hash of the URL
+         * @return Object
+         */
+        function getHashParams() {
+          var hashParams = {};
+          var e, r = /([^&;=]+)=?([^&;]*)/g,
+              q = window.location.hash.substring(1);
+          while ( e = r.exec(q)) {
+             hashParams[e[1]] = decodeURIComponent(e[2]);
+          }
+          return hashParams;
+        }
+
+        var userProfileSource = document.getElementById('user-profile-template').innerHTML,
+            userProfileTemplate = Handlebars.compile(userProfileSource),
+            userProfilePlaceholder = document.getElementById('user-profile');
+
+        var oauthSource = document.getElementById('oauth-template').innerHTML,
+            oauthTemplate = Handlebars.compile(oauthSource),
+            oauthPlaceholder = document.getElementById('oauth');
+
+        var musicSource = document.getElementById('music-template').innerHTML,
+            musicTemplate = Handlebars.compile(musicSource),
+            musicPlaceholder = document.getElementById('music');
+
+        var progressSource = document.getElementById('progress-template').innerHTML,
+            progressTemplate = Handlebars.compile(progressSource),
+            progressPlaceholder = document.getElementById('progress');
+
+        var params = getHashParams();
+
+        var access_token = params.access_token,
+            refresh_token = params.refresh_token,
+            error = params.error;
+
+        var curr_length = "0:00",
+            curr_pos_ms = 0,
+            curr_length_ms = 0;
+        
+
+        function update_player(refresh_token, access_token, set_slider) {
+          if (access_token) {            
+            $.ajax({
+                type: "GET",
+                url: '/get_song_status',
+                data: {
+                  'refresh_token': refresh_token,
+                  'access_token': access_token
+                },
+                timeout: 5000
+              
+              })
+              .done(function(data) {
+                var song_length = dispTime(data.length);
+
+                musicPlaceholder.innerHTML = musicTemplate({
+                  song_title: data.song_title,
+                  curr_pos: dispTime(data.curr_pos),
+                  length: song_length
+                });
+
+                curr_pos_ms = data.curr_pos;
+                curr_length_ms = data.length;
+
+                // Song changed, should update and reset slider
+                if (song_length != curr_length) {
+                  set_slider = true;
+                  curr_length = song_length;
+                }
+
+                progressPlaceholder.innerHTML = progressTemplate({
+                  curr_pos: dispTime(data.curr_pos)
+                });
+
+                //play_marker_style.left = Math.trunc(data.curr_pos/data.length * 100 * 1000)/1000 + "%";
+                $('#play-marker').position({
+                  my: "center",
+                  at: "left+" + Math.trunc(data.curr_pos/data.length * 100 * 1000)/1000 + "% top-25",
+                  of: "#progress-bar"
+                });
+
+                //$("#play-marker").toggle().toggle();
+                
+                $('#slider-range').slider('option','max', data.length);
+                if (set_slider) {
+                  $('#slider-range').slider('values', [0, data.length]);
+                  $( "#amount" ).val( "$" + dispTime(0) + " - $" + dispTime(data.length));
+                }
+
+                // Check if we should loop
+                if (data.curr_pos >= $('#slider-range').slider('values', 1)) {
+                  $.ajax({
+                    url: '/seek_to_pos',
+                    data: {
+                      'refresh_token': refresh_token,
+                      'access_token': access_token,
+                      'pos': $('#slider-range').slider('values', 0)
+                    }
+                  }).done(function(data) {});
+                }
+                
+              }).fail(function (jqXHR, textStatus, errorThrown) {
+                console.log("failed: " + textStatus);
+                if (status==="timeout") {
+                  $.ajax(this);
+                }
+              });
+          }
+        }
+
+        function get_new_access_token() {
+          $.ajax({
+            url: '/refresh_token',
+            data: {
+              'refresh_token': refresh_token
+            }
+          }).done(function (data) {
+            access_token = data.access_token;
+            console.log("New AT: " + access_token);
+          });
+        }
+
+        if (error) {
+          alert('There was an error during the authentication');
+        } else {
+          if (access_token) {
+            $.ajax({
+                url: 'https://api.spotify.com/v1/me',
+                headers: {
+                  'Authorization': 'Bearer ' + access_token
+                },
+                success: function(response) {
+                  userProfilePlaceholder.innerHTML = userProfileTemplate(response);
+
+                  $('#login').hide();
+                  $('#loggedin').show();
+                }
+            });
+            update_player(refresh_token, access_token, true);
+            
+          } else {
+              // render initial screen
+              $('#login').show();
+              $('#loggedin').hide();
+          }
+
+          document.getElementById('play-music').addEventListener('click', function() {
+            $.ajax({
+              url: '/play',
+              data: {
+                'refresh_token': refresh_token,
+                'access_token': access_token
+              }
+            }).done(function(data) { });
+           
+          }, false);
+
+          document.getElementById('pause-music').addEventListener('click', function() {
+            $.ajax({
+              url: '/pause',
+              data: {
+                'refresh_token': refresh_token,
+                'access_token': access_token
+              }
+            }).done(function(data) { });
+           
+          }, false);
+
+          document.getElementById('restart-loop').addEventListener('click', function() {
+            $.ajax({
+              url: '/seek_to_pos',
+              data: {
+                'refresh_token': refresh_token,
+                'access_token': access_token,
+                'pos': $('#slider-range').slider('values', 0)
+              }
+            }).done(function(data) { });
+
+          }, false);
+
+          // Set first slider to current position, play song, and set back slider when clicked again
+          document.getElementById('set-loop').addEventListener('click', function() {
+            if ($('#set-loop').hasClass('active')) {
+              $('#slider-range').slider('values', 1, curr_pos_ms);
+            } else {
+              $('#slider-range').slider('values', 0, curr_pos_ms);
+            }
+
+          }, false);
+
+          document.getElementById('reset-loop').addEventListener('click', function() {
+              $('#slider-range').slider('values', 0, 0);
+              $('#slider-range').slider('values', 1, curr_length_ms);
+          }, false);
+          
+          $('#slider-range').on('slidestop', function(event, ui) {
+            if (ui.handleIndex == 0) {
+              $.ajax({
+                url: '/seek_to_pos',
+                data: {
+                  'refresh_token': refresh_token,
+                  'access_token': access_token,
+                  'pos': ui.values[0]
+                }
+              }).done(function(data) {});
+              
+            }
+          });
+
+          setInterval(function() { update_player(refresh_token, access_token, false) }, 200);
+          setInterval(function() { get_new_access_token ()}, 45 * 60 * 1000); // refresh access token every 45 minutes
+        }
+      })();
+    </script>
+  </body>
+</html>
+
