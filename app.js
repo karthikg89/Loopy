@@ -16,7 +16,7 @@ var cookieParser = require('cookie-parser');
 
 var client_id = '90578a866be642ed97064a098d97fecd'; // your clientId
 var client_secret = '51aab784c7444a6f992995510988c0f4'; // Your secret
-var redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
+var redirect_uri = 'https://loopy-5umu.onrender.com/callback'; // Your redirect uri
 
 
 const generateRandomString = (length) => {
